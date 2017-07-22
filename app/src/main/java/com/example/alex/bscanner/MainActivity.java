@@ -27,9 +27,15 @@ import java.util.TreeMap;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "BScanner";
+    private scanningStatuses scanStatus = null;
+    private Menu storedMenu;
     private HashMap<Integer, String> mDeviceList = new HashMap<Integer, String>();
+    private BluetoothAdapter mBluetoothAdapter;
 
-    BluetoothAdapter mBluetoothAdapter;
+    private enum scanningStatuses {
+        SCAN_IN_PROGRESS,
+        SCAN_STOPPED
+    }
 
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
@@ -37,9 +43,10 @@ public class MainActivity extends AppCompatActivity {
 
             // BT adapter actions listeners
             if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
-                Log.d(TAG, "Scanning started");
+                scanStatus = scanningStatuses.SCAN_IN_PROGRESS;
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
-                Log.d(TAG, "Scanning finished");
+                scanStatus = scanningStatuses.SCAN_STOPPED;
+                showScanButton();
             } else if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
                 final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
 
@@ -66,12 +73,20 @@ public class MainActivity extends AppCompatActivity {
     public void onSaveInstanceState(Bundle savedInstanceState) {
         super.onSaveInstanceState(savedInstanceState);
         savedInstanceState.putSerializable("mDeviceList", mDeviceList);
+        savedInstanceState.putSerializable("scanStatus", scanStatus);
     }
 
     @Override
     public void onRestoreInstanceState(Bundle savedInstanceState) {
+        // restore device list and render it
         mDeviceList = (HashMap<Integer, String>) savedInstanceState.getSerializable("mDeviceList");
         renderDeviceList(mDeviceList);
+
+        // restore scan status and run scanning if required
+        scanStatus = (scanningStatuses) savedInstanceState.getSerializable("scanStatus");
+        if (scanStatus == scanningStatuses.SCAN_IN_PROGRESS) {
+            startScanning();
+        }
     }
 
     @Override
@@ -84,7 +99,13 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
+        storedMenu = menu;
         getMenuInflater().inflate(R.menu.menu_main, menu);
+
+        if (scanStatus == scanningStatuses.SCAN_IN_PROGRESS) {
+            hideScanButton();
+        }
+
         return true;
     }
 
@@ -167,13 +188,29 @@ public class MainActivity extends AppCompatActivity {
         registerReceiver(mBroadcastReceiver, filter);
 
         mBluetoothAdapter.startDiscovery();
+        hideScanButton();
+    }
+
+    protected void hideScanButton()
+    {
+        if (storedMenu != null) {
+            MenuItem item = storedMenu.findItem(R.id.action_scan);
+            item.setVisible(false);
+        }
+    }
+
+    protected void showScanButton()
+    {
+        if (storedMenu != null) {
+            MenuItem item = storedMenu.findItem(R.id.action_scan);
+            item.setVisible(true);
+        }
     }
 
     protected void renderDeviceList(HashMap<Integer, String> mDeviceList) {
         ArrayList<String> mSortedDeviceArray = sortHashMapByKeyDesc(mDeviceList);
 
-        ArrayAdapter adapter = new ArrayAdapter<String>(this,
-                R.layout.activity_listview, mSortedDeviceArray);
+        ArrayAdapter adapter = new ArrayAdapter<String>(this, R.layout.activity_listview, mSortedDeviceArray);
 
         ListView listView = (ListView) findViewById(R.id.devices);
         listView.setAdapter(adapter);
@@ -201,6 +238,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     protected void destroyReceivers() {
+        // quick workaround for preventing app crash, after device rotation
         try {
             unregisterReceiver(mBroadcastReceiver);
         } catch (IllegalArgumentException e) {
