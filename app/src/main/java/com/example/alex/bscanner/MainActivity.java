@@ -1,9 +1,10 @@
 package com.example.alex.bscanner;
 
+import android.content.DialogInterface;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.Menu;
-import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.widget.TextView;
 
@@ -27,11 +28,45 @@ public class MainActivity extends AppCompatActivity {
         TextView placeholder = (TextView) findViewById(R.id.placeholder);
 
         if (id == R.id.action_scan) {
+            if (!isBluetoothEnabled()) {
+                enableBluetooth();
+            }
+
             placeholder.setText("Sucess");
         } else {
             placeholder.setText("Fialure");
         }
 
         return true;
+    }
+
+    protected boolean isBluetoothEnabled() {
+        return false;
+    }
+
+    protected void enableBluetooth() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+
+        builder.setCancelable(true);
+        builder.setTitle("Bluetooth is disabled");
+        builder.setMessage("Enable bluetooth?");
+
+        builder.setPositiveButton("Enable",
+            new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    // enable bluetooth
+                }
+            });
+
+        builder.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                // do nothing
+            }
+        });
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
     }
 }
