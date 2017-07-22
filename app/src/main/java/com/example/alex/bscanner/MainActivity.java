@@ -6,7 +6,8 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.widget.TextView;
+import android.widget.ArrayAdapter;
+import android.widget.ListView;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -25,16 +26,20 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
-        TextView placeholder = (TextView) findViewById(R.id.placeholder);
 
         if (id == R.id.action_scan) {
             if (!isBluetoothEnabled()) {
                 enableBluetooth();
             }
 
-            placeholder.setText("Sucess");
+            String[] devicesList = getDevicesList();
+
+            ArrayAdapter adapter = new ArrayAdapter<String>(this,
+                    R.layout.activity_listview, devicesList);
+
+            ListView listView = (ListView) findViewById(R.id.devices);
+            listView.setAdapter(adapter);
         } else {
-            placeholder.setText("Fialure");
         }
 
         return true;
@@ -68,5 +73,17 @@ public class MainActivity extends AppCompatActivity {
 
         AlertDialog dialog = builder.create();
         dialog.show();
+    }
+
+    protected String[] getDevicesList() {
+        // implement fetching logic
+        String[] devicesList = {"Device 1","Device 2","Device 3","Device 4",
+                "Device 5","Device 6","Device 7","Device 8","Device 9","Device 10","Device 11","Device 12",
+                "Device 13","Device 14","Device 16","Device 17","Device18 ","Device 19","Device 20",
+                "Device 21","Device 22","Device 23","Device 24"};
+
+        // implement sorting logic
+
+        return devicesList;
     }
 }
