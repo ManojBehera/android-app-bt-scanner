@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.renderscript.Sampler;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -17,47 +18,67 @@ import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "BScanner";
-    private ArrayList<String> mDeviceList = new ArrayList<String>();
-    private ListView listView;
-
+    private HashMap<Integer, String> mDeviceList = new HashMap<Integer, String>();
 
     BluetoothAdapter mBluetoothAdapter;
 
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
-            if (BluetoothDevice.ACTION_FOUND.equals(action)) {
-                // Discovery has found a device. Get the BluetoothDevice
-                // object and its info from the Intent.
-                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                String deviceName = device.getName();
-                String deviceHardwareAddress = device.getAddress(); // MAC address
-                mDeviceList.add("Name:" + deviceName + "\n" + "MAC: " + deviceHardwareAddress);
-                Log.d(TAG, deviceName);
-                Log.d(TAG, deviceHardwareAddress);
-                renderDeviceList(context, mDeviceList);
-            } else if (action.equals(mBluetoothAdapter.ACTION_STATE_CHANGED)) {
-                final int state = intent.getIntExtra(mBluetoothAdapter.EXTRA_STATE, mBluetoothAdapter.ERROR);
+
+            // BT adapter actions listeners
+            if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
+                Log.d(TAG, "Scanning started");
+            } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
+                Log.d(TAG, "Scanning finished");
+            } else if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+                final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
 
                 if (state == BluetoothAdapter.STATE_ON) {
-                    Log.d(TAG, "Bluetooth has been turned on");
+                    startScanning();
                 }
+            }
+
+            //  BD device actions listeners
+            if (BluetoothDevice.ACTION_FOUND.equals(action)) {
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+
+                String deviceName = device.getName();
+                String deviceHardwareAddress = device.getAddress(); // MAC address
+                int rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI,Short.MIN_VALUE); // signal strength
+
+                mDeviceList.put(rssi, "Name:" + deviceName + "\n" + "MAC: " + deviceHardwareAddress + "\n" + "Signal strength: " + rssi);
+                renderDeviceList(mDeviceList);
             }
         }
     };
 
+    @Override
+    public void onSaveInstanceState(Bundle savedInstanceState) {
+        super.onSaveInstanceState(savedInstanceState);
+        savedInstanceState.putSerializable("mDeviceList", mDeviceList);
+    }
+
+    @Override
+    public void onRestoreInstanceState(Bundle savedInstanceState) {
+        mDeviceList = (HashMap<Integer, String>) savedInstanceState.getSerializable("mDeviceList");
+        renderDeviceList(mDeviceList);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        listView = (ListView) findViewById(R.id.devices);
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
     }
 
@@ -72,26 +93,23 @@ public class MainActivity extends AppCompatActivity {
         int id = item.getItemId();
 
         if (id == R.id.action_scan) {
-            if (!isBluetoothEnabled()) {
-                Log.d(TAG, "BT is disabled trying to enable");
-                Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-                startActivity(enableBtIntent);
+            if (mBluetoothAdapter != null) {
+                // Prepare for a new scan
+                mDeviceList.clear();
+                destroyReceivers();
 
-                IntentFilter BTIntent = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
-                registerReceiver(mBroadcastReceiver, BTIntent);
+                if (!isBluetoothEnabled()) {
+                    Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+                    startActivity(enableBtIntent);
+
+                    IntentFilter BTIntent = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
+                    registerReceiver(mBroadcastReceiver, BTIntent);
+                } else {
+                    startScanning();
+                }
             } else {
-                getDevicesList();
+                // TODO: implement no BT adapter notification
             }
-
-            /*String[] devicesList = getDevicesList();
-
-            ArrayAdapter adapter = new ArrayAdapter<String>(this,
-                    R.layout.activity_listview, devicesList);
-
-            ListView listView = (ListView) findViewById(R.id.devices);
-            listView.setAdapter(adapter);*/
-        } else {
-            getDevicesList();
         }
 
         return true;
@@ -99,7 +117,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        unregisterReceiver(mBroadcastReceiver);
+        destroyReceivers();
         super.onDestroy();
     }
 
@@ -138,33 +156,55 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
     }*/
 
-    protected void getDevicesList() {
-        mBluetoothAdapter.startDiscovery();
+    protected void startScanning() {
+        IntentFilter discoveryStartedFilter = new IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
+        registerReceiver(mBroadcastReceiver, discoveryStartedFilter);
+
+        IntentFilter discoveryFinishedFilter = new IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+        registerReceiver(mBroadcastReceiver, discoveryFinishedFilter);
 
         IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
         registerReceiver(mBroadcastReceiver, filter);
-        /*Set<BluetoothDevice> pairedDevices = mBluetoothAdapter.getBondedDevices();
 
-        List<String> s = new ArrayList<String>();
-        for(BluetoothDevice bt : pairedDevices)
-            s.add(bt.getName());
-
-        //setListAdapter(new ArrayAdapter<String>(this, R.layout.list, s));
-        // implement fetching logic
-        String[] devicesList = {"Device 1","Device 2","Device 3","Device 4",
-                "Device 5","Device 6","Device 7","Device 8","Device 9","Device 10","Device 11","Device 12",
-                "Device 13","Device 14","Device 16","Device 17","Device18 ","Device 19","Device 20",
-                "Device 21","Device 22","Device 23","Device 24"};
-
-        // implement sorting logic
-
-        Log.d(TAG, s.get(0));
-
-        return devicesList;*/
+        mBluetoothAdapter.startDiscovery();
     }
 
-    protected void renderDeviceList(Context context, ArrayList mDeviceList) {
-        listView.setAdapter(new ArrayAdapter<String>(context,
-                android.R.layout.simple_list_item_1, mDeviceList));
+    protected void renderDeviceList(HashMap<Integer, String> mDeviceList) {
+        ArrayList<String> mSortedDeviceArray = sortHashMapByKeyDesc(mDeviceList);
+
+        ArrayAdapter adapter = new ArrayAdapter<String>(this,
+                R.layout.activity_listview, mSortedDeviceArray);
+
+        ListView listView = (ListView) findViewById(R.id.devices);
+        listView.setAdapter(adapter);
+    }
+
+    protected ArrayList sortHashMapByKeyDesc(HashMap<Integer, String> hashMap) {
+        Map<Integer, String> treeMap = new TreeMap<Integer, String>(
+            new Comparator<Integer>() {
+                @Override
+                public int compare(Integer i1, Integer i2) {
+                    if (i1 > i2) {
+                        return -1;
+                    } else if (i1 < i2) {
+                        return 1;
+                    }
+
+                    return 0;
+                }
+            }
+        );
+
+        treeMap.putAll(mDeviceList);
+
+        return new ArrayList(treeMap.values());
+    }
+
+    protected void destroyReceivers() {
+        try {
+            unregisterReceiver(mBroadcastReceiver);
+        } catch (IllegalArgumentException e) {
+            Log.d(TAG, e.getMessage());
+        }
     }
 }
