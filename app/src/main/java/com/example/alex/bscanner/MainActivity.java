@@ -22,6 +22,10 @@ import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "BScanner";
+    private ArrayList<String> mDeviceList = new ArrayList<String>();
+    private ListView listView;
+
+
     BluetoothAdapter mBluetoothAdapter;
 
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
@@ -33,8 +37,10 @@ public class MainActivity extends AppCompatActivity {
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 String deviceName = device.getName();
                 String deviceHardwareAddress = device.getAddress(); // MAC address
+                mDeviceList.add("Name:" + deviceName + "\n" + "MAC: " + deviceHardwareAddress);
                 Log.d(TAG, deviceName);
                 Log.d(TAG, deviceHardwareAddress);
+                renderDeviceList(context, mDeviceList);
             } else if (action.equals(mBluetoothAdapter.ACTION_STATE_CHANGED)) {
                 final int state = intent.getIntExtra(mBluetoothAdapter.EXTRA_STATE, mBluetoothAdapter.ERROR);
 
@@ -51,6 +57,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        listView = (ListView) findViewById(R.id.devices);
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
     }
 
@@ -154,5 +161,10 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, s.get(0));
 
         return devicesList;*/
+    }
+
+    protected void renderDeviceList(Context context, ArrayList mDeviceList) {
+        listView.setAdapter(new ArrayAdapter<String>(context,
+                android.R.layout.simple_list_item_1, mDeviceList));
     }
 }
