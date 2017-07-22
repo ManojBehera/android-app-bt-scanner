@@ -16,6 +16,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.ProgressBar;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -115,10 +116,6 @@ public class MainActivity extends AppCompatActivity {
 
         if (id == R.id.action_scan) {
             if (mBluetoothAdapter != null) {
-                // Prepare for a new scan
-                mDeviceList.clear();
-                destroyReceivers();
-
                 if (!isBluetoothEnabled()) {
                     Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
                     startActivity(enableBtIntent);
@@ -126,6 +123,9 @@ public class MainActivity extends AppCompatActivity {
                     IntentFilter BTIntent = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
                     registerReceiver(mBroadcastReceiver, BTIntent);
                 } else {
+                    mDeviceList.clear();
+                    renderDeviceList(mDeviceList);
+                    destroyReceivers();
                     startScanning();
                 }
             } else {
@@ -197,6 +197,9 @@ public class MainActivity extends AppCompatActivity {
             MenuItem item = storedMenu.findItem(R.id.action_scan);
             item.setVisible(false);
         }
+
+        ProgressBar scan_indicator = (ProgressBar) findViewById(R.id.scan_indicator);
+        scan_indicator.setVisibility(ProgressBar.VISIBLE);
     }
 
     protected void showScanButton()
@@ -205,6 +208,9 @@ public class MainActivity extends AppCompatActivity {
             MenuItem item = storedMenu.findItem(R.id.action_scan);
             item.setVisible(true);
         }
+
+        ProgressBar scan_indicator = (ProgressBar) findViewById(R.id.scan_indicator);
+        scan_indicator.setVisibility(ProgressBar.INVISIBLE);
     }
 
     protected void renderDeviceList(HashMap<Integer, String> mDeviceList) {
