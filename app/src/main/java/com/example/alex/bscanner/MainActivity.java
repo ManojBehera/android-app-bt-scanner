@@ -1,6 +1,9 @@
 package com.example.alex.bscanner;
 
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v4.app.ActivityCompat;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.support.v7.app.AlertDialog;
@@ -16,6 +19,7 @@ import android.view.MenuItem;
 import android.view.Menu;
 import android.os.Bundle;
 import android.util.Log;
+import android.Manifest;
 
 import java.util.Comparator;
 import java.util.ArrayList;
@@ -24,10 +28,13 @@ import java.util.TreeMap;
 import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
+    private static final int MY_PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION = 1;
+
     private scanningStatuses scanStatus = null;
     private Menu storedMenu;
     private HashMap<Integer, String> mDeviceList = new HashMap<Integer, String>();
     private BluetoothAdapter mBluetoothAdapter;
+    private boolean coarseLocationPermissionGranted = false;
 
     private enum scanningStatuses {
         SCAN_IN_PROGRESS,
@@ -80,10 +87,14 @@ public class MainActivity extends AppCompatActivity {
         super.onSaveInstanceState(savedInstanceState);
         savedInstanceState.putSerializable("mDeviceList", mDeviceList);
         savedInstanceState.putSerializable("scanStatus", scanStatus);
+        savedInstanceState.putBoolean("coarseLocationPermissionGranted", coarseLocationPermissionGranted);
     }
 
     @Override
     public void onRestoreInstanceState(Bundle savedInstanceState) {
+        // restore permission request status
+        coarseLocationPermissionGranted = savedInstanceState.getBoolean("coarseLocationPermissionGranted");
+
         // restore device list and render it
         mDeviceList = (HashMap<Integer, String>) savedInstanceState.getSerializable("mDeviceList");
         renderDeviceList(mDeviceList);
@@ -95,10 +106,30 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode == MY_PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION) {
+            if (grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            ) {
+                coarseLocationPermissionGranted = true;
+                startDiscovery();
+            } else {
+                showErrorMessage(
+                    "Your Android version requires location permission"
+                        + " for scanning for Bluetooth devices."
+                );
+            }
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        if (!isLocationPermissionRequired()) {
+            coarseLocationPermissionGranted = true;
+        }
 
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
     }
@@ -123,6 +154,19 @@ public class MainActivity extends AppCompatActivity {
         IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
         registerReceiver(mBroadcastReceiver, filter);
 
+        if (coarseLocationPermissionGranted == false
+            && isLocationPermissionRequired()
+        ) {
+            ActivityCompat.requestPermissions(this,
+                new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
+                MY_PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION
+            );
+        } else {
+            startDiscovery();
+        }
+    }
+
+    protected void startDiscovery() {
         mBluetoothAdapter.startDiscovery();
         hideScanButton();
     }
@@ -215,6 +259,10 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    protected boolean isLocationPermissionRequired() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M;
+    }
+
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
@@ -249,9 +297,9 @@ public class MainActivity extends AppCompatActivity {
 
                 mDeviceList.put(
                     rssi,
-                    "Name:" + deviceName + "\n"
-                            + "MAC: " + deviceHardwareAddress
-                            + "\n" + "Signal strength: " + rssi
+                    "Name: " + deviceName + "\n"
+                        + "MAC: " + deviceHardwareAddress
+                        + "\n" + "Signal strength: " + rssi
                 );
                 renderDeviceList(mDeviceList);
             }
