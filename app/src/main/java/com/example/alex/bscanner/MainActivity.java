@@ -1,12 +1,11 @@
 package com.example.alex.bscanner;
 
-import android.content.pm.PackageManager;
-import android.os.Build;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v4.app.ActivityCompat;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.support.v7.app.AlertDialog;
+import android.content.pm.PackageManager;
 import android.content.BroadcastReceiver;
 import android.content.DialogInterface;
 import android.content.IntentFilter;
@@ -18,6 +17,7 @@ import android.widget.ListView;
 import android.view.MenuItem;
 import android.view.Menu;
 import android.os.Bundle;
+import android.os.Build;
 import android.util.Log;
 import android.Manifest;
 
